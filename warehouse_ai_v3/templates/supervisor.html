@@ -1,0 +1,382 @@
+{% extends 'base.html' %}
+{% block title %}Supervisor - Warehouse AI Pro{% endblock %}
+
+{% block content %}
+<div style="display: flex; justify-content: space-between; align-items: flex-end; margin-bottom: 24px;">
+    <div>
+        <h1>Supervisor Command Center</h1>
+        <p class="subtitle">Complete warehouse oversight, user management, and broadcast communication.</p>
+    </div>
+    <div style="display: flex; gap: 12px; align-items: center;">
+        <form method="post" action="/export/users/employee" style="margin: 0;">
+            <button type="submit" class="btn btn-primary" style="background: #3b82f6;">📊 Export Employee Report</button>
+        </form>
+        <form method="post" action="/export/users/manager" style="margin: 0;">
+            <button type="submit" class="btn btn-primary" style="background: #10b981; border-color: #10b981;">📊 Export Manager Report</button>
+        </form>
+        <a href="/users" class="btn btn-purple">👥 Manage Users & QR</a>
+    </div>
+</div>
+
+<div class="grid-cards">
+    <div class="glass stat-card">
+        <div class="stat-label">📥 INCOMING ITEMS</div>
+        <div class="stat-value" id="tin" style="color: #34d399;">{{ total_in }}</div>
+    </div>
+    <div class="glass stat-card">
+        <div class="stat-label">📤 DISPATCHED ITEMS</div>
+        <div class="stat-value" id="tout" style="color: #60a5fa;">{{ total_out }}</div>
+    </div>
+    <div class="glass stat-card">
+        <div class="stat-label">🚨 OPEN ISSUES</div>
+        <div class="stat-value" id="issues" style="color: #f87171;">{{ open_issues }}</div>
+    </div>
+    <div class="glass stat-card" style="cursor: pointer;" onclick="window.location.href='/users'" title="Manage Users">
+        <div class="stat-label">👥 ACTIVE TEAM</div>
+        <div class="stat-value" style="color: #c084fc;">{{ employees + managers }}</div>
+    </div>
+</div>
+
+<div class="dashboard-grid">
+    <div>
+        <div class="glass panel">
+            <div class="panel-header">
+                <h2>📈 Manager Performance</h2>
+            </div>
+            <table>
+                <tr>
+                    <th>Manager</th>
+                    <th>Issues Resolved</th>
+                    <th>Logs Verified</th>
+                    <th>Perf Score</th>
+                </tr>
+                {% for perf in manager_perf %}
+                <tr>
+                    <td><b>{{ perf.name }}</b> <span style="font-size: 11px; color: var(--text-muted);">{{ perf.user_id }}</span></td>
+                    <td>{{ perf.resolutions }}</td>
+                    <td>{{ perf.verifications }}</td>
+                    <td><span class="status-badge" style="background: rgba(139, 92, 246, 0.2); color: #c4b5fd;">{{ perf.score }}</span></td>
+                </tr>
+                {% else %}
+                <tr>
+                    <td colspan="4" style="text-align: center; color: var(--text-muted);">No managers active.</td>
+                {% endfor %}
+            </table>
+        </div>
+
+        <div class="glass panel">
+            <div class="panel-header">
+                <h2>📁 Manager Reports Received</h2>
+            </div>
+            {% for r in manager_reports %}
+            <div class="message-box" style="border-left-color: var(--purple);">
+                <div class="msg-meta">
+                    <span>Sent by {{ r.sender_id }}</span>
+                    <span>{{ r.created_at.strftime("%d %b %H:%M") }}</span>
+                </div>
+                <div class="msg-title">{{ r.subject }}</div>
+                <div style="margin-top: 10px; display: flex; justify-content: space-between; align-items: center;">
+                    <a href="{{ url_for('static', filename='reports/' + r.attachment) }}" download class="btn btn-purple" style="padding: 6px 12px; font-size: 13px; text-decoration: none;">📥 Download Report</a>
+                    <form method="post" action="/messages/delete/{{ r.id }}" onsubmit="return confirm('Delete this report?');">
+                        <button class="btn btn-danger" style="padding: 6px 12px; font-size: 13px;">🗑️</button>
+                    </form>
+                </div>
+            </div>
+            {% else %}
+            <p style="color: var(--text-muted);">No Manager Reports received yet.</p>
+            {% endfor %}
+            
+            <hr style="border-top: 1px solid var(--glass-border); margin: 24px 0;">
+            
+            <div class="panel-header">
+                <h2>📄 Employee Reports Received</h2>
+            </div>
+            {% for r in employee_reports %}
+            <div class="message-box" style="border-left-color: #3b82f6;">
+                <div class="msg-meta">
+                    <span>Sent by {{ r.sender_id }}</span>
+                    <span>{{ r.created_at.strftime("%d %b %H:%M") }}</span>
+                </div>
+                <div class="msg-title">{{ r.subject }}</div>
+                <div style="margin-top: 10px; display: flex; justify-content: space-between; align-items: center;">
+                    <a href="{{ url_for('static', filename='reports/' + r.attachment) }}" download class="btn btn-primary" style="padding: 6px 12px; font-size: 13px; text-decoration: none;">📥 Download Report</a>
+                    <form method="post" action="/messages/delete/{{ r.id }}" onsubmit="return confirm('Delete this report?');">
+                        <button class="btn btn-danger" style="padding: 6px 12px; font-size: 13px;">🗑️</button>
+                    </form>
+                </div>
+            </div>
+            {% else %}
+            <p style="color: var(--text-muted);">No Employee Reports received yet.</p>
+            {% endfor %}
+        </div>
+
+        <div class="glass panel">
+            <div class="panel-header">
+                <h2>⚡ Live Activity Stream</h2>
+            </div>
+            <table>
+                <tr>
+                    <th>Date</th>
+                    <th>Time</th>
+                    <th>Item</th>
+                    <th>Qty</th>
+                    <th>Type</th>
+                    <th>Status</th>
+                    <th>Logged By</th>
+                    <th>Verified By</th>
+                    <th>Action</th>
+                </tr>
+                {% for m in movements %}
+                <tr>
+                    <td>{{ m.created_at.strftime("%d %b %Y") }}</td>
+                    <td>{{ m.created_at.strftime("%H:%M:%S") }}</td>
+                    <td><b>{{ m.item }}</b></td>
+                    <td>{{ m.quantity }}</td>
+                    <td>
+                        {% if m.direction=="IN" %}
+                        <span style="color: #10b981; font-weight: bold;">▲ IN</span>
+                        {% else %}
+                        <span style="color: #60a5fa; font-weight: bold;">▼ OUT</span>
+                        {% endif %}
+                    </td>
+                    <td><span class="status-badge status-{{ m.status }}">{{ m.status }}</span></td>
+                    <td><span style="font-size: 12px; color: #a78bfa;">{{ m.created_by }}</span></td>
+                    <td>
+                        {% if m.verified_by %}
+                            <span style="font-size: 12px; color: #34d399;">{{ m.verified_by }}</span>
+                        {% else %}
+                            <span style="font-size: 12px; color: var(--text-muted);">-</span>
+                        {% endif %}
+                    </td>
+                    <td>
+                        <form method="post" action="/movement/{{ m.id }}/hard_delete" onsubmit="return confirm('Permanently delete this record?');">
+                            <button title="Delete" style="background: rgba(239,68,68,0.2); color: #f87171; border: 1px solid #f87171; padding: 4px 8px; border-radius: 6px; cursor: pointer;">🗑️</button>
+                        </form>
+                    </td>
+                </tr>
+                {% endfor %}
+            </table>
+        </div>
+        
+        <div class="glass panel">
+            <div class="panel-header">
+                <h2>🚨 Open Issues & Flags</h2>
+            </div>
+            {% for i in issues_list %}
+            <div class="message-box" style="border-left-color: var(--danger);">
+                <div class="msg-meta">
+                    <span>{{ i.issue_type }}</span>
+                    <span>By {{ i.created_by }}</span>
+                </div>
+                <div class="msg-title">{{ i.item }}</div>
+                <div class="msg-body">{{ i.description }}</div>
+                {% if i.photo %}
+                <div style="margin-top: 12px;">
+                    <img src="{{ url_for('static', filename='issues/' + i.photo) }}" style="max-width: 100%; max-height: 200px; border-radius: 8px; border: 1px solid rgba(255,255,255,0.1);">
+                </div>
+                {% endif %}
+                
+                <div style="margin-top: 16px; padding: 10px; background: rgba(0,0,0,0.2); border-radius: 8px; border: 1px solid rgba(255,255,255,0.05);">
+                    <h4 style="margin: 0 0 10px 0; font-size: 13px; color: var(--primary);">💬 Discussion (Manager & Employee)</h4>
+                    {% for c in i.comments %}
+                        <div style="margin-bottom: 8px; font-size: 13px;">
+                            <span style="color: #a78bfa; font-weight: bold;">{{ c.sender_id }}:</span> 
+                            <span style="color: var(--text-main);">{{ c.body }}</span>
+                            <span style="font-size: 10px; color: var(--text-muted); float: right;">{{ c.created_at.strftime("%H:%M") }}</span>
+                        </div>
+                    {% else %}
+                        <div style="font-size: 12px; color: var(--text-muted); margin-bottom: 8px;">No conversation yet.</div>
+                    {% endfor %}
+                </div>
+            </div>
+            {% else %}
+            <p style="color: var(--text-muted);">✅ No active issues.</p>
+            {% endfor %}
+        </div>
+        
+        <div class="glass panel" style="margin-top: 24px;">
+            <div class="panel-header">
+                <h2>🗄️ Resolved Issues Archive</h2>
+            </div>
+            <table>
+                <tr>
+                    <th>Date</th>
+                    <th>Item</th>
+                    <th>Type</th>
+                    <th>Description & Log</th>
+                    <th>Resolved By</th>
+                    <th>Action</th>
+                </tr>
+                {% for i in resolved_issues %}
+                <tr>
+                    <td>{{ i.created_at.strftime("%d %b %Y") }}</td>
+                    <td><b>{{ i.item }}</b></td>
+                    <td>{{ i.issue_type }}</td>
+                    <td style="min-width: 350px; max-width: 500px;">
+                        <div style="font-size: 14px; line-height: 1.6; color: #f1f5f9; margin-bottom: 12px;">{{ i.description }}</div>
+                        {% if i.photo %}
+                        <div style="margin-bottom: 12px;">
+                            <img src="{{ url_for('static', filename='issues/' + i.photo) }}" style="max-width: 100%; max-height: 150px; border-radius: 8px; border: 1px solid rgba(255,255,255,0.1);">
+                        </div>
+                        {% endif %}
+                        {% if i.comments %}
+                        <button style="background: rgba(16, 185, 129, 0.1); color: #34d399; border: 1px solid #34d399; padding: 6px 12px; border-radius: 8px; font-size: 13px; font-weight: 600; cursor: pointer; transition: 0.2s;" onmouseover="this.style.background='rgba(16, 185, 129, 0.2)'" onmouseout="this.style.background='rgba(16, 185, 129, 0.1)'" onclick="document.getElementById('chatModal_{{ i.id }}').style.display='flex'">💬 View Conversation</button>
+                        
+                        <div id="chatModal_{{ i.id }}" style="display: none; position: fixed; z-index: 10000; left: 0; top: 0; width: 100%; height: 100%; background-color: rgba(0,0,0,0.8); align-items: center; justify-content: center;">
+                            <div style="background: var(--bg-grad-2); padding: 24px; border-radius: 12px; width: 90%; max-width: 600px; border: 1px solid rgba(16,185,129,0.3); max-height: 85vh; display: flex; flex-direction: column; text-align: left;">
+                                <h3 style="margin-top: 0; display: flex; justify-content: space-between; color: white; border-bottom: 1px solid var(--glass-border); padding-bottom: 12px; font-size: 18px;">
+                                    💬 Final Conversation Log
+                                    <span style="cursor: pointer; color: #f87171;" onclick="document.getElementById('chatModal_{{ i.id }}').style.display='none'">✖</span>
+                                </h3>
+                                <div style="flex: 1; overflow-y: auto; padding-top: 16px; display: flex; flex-direction: column; gap: 12px;">
+                                    {% if i.photo %}
+                                    <div style="margin-bottom: 12px; text-align: center;">
+                                        <img src="{{ url_for('static', filename='issues/' + i.photo) }}" style="max-width: 100%; max-height: 350px; border-radius: 8px; border: 1px solid rgba(255,255,255,0.1);">
+                                    </div>
+                                    {% endif %}
+                                    {% for c in i.comments %}
+                                        <div style="padding: 12px 16px; border-radius: 10px; background: rgba(255, 255, 255, 0.05); border-left: 4px solid #10b981;">
+                                            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px;">
+                                                <span style="color: #34d399; font-weight: bold; font-size: 14px;">{{ c.sender_id }}</span>
+                                                <span style="color: #94a3b8; font-size: 12px;">{{ c.created_at.strftime("%d %b %H:%M") }}</span>
+                                            </div>
+                                            <div style="color: #f8fafc; font-size: 14px; line-height: 1.5;">{{ c.body }}</div>
+                                        </div>
+                                    {% endfor %}
+                                </div>
+                            </div>
+                        </div>
+                        {% endif %}
+                    </td>
+                    <td><span style="color: #34d399; font-weight: 500;">{{ i.resolved_by }}</span></td>
+                    <td>
+                        <form method="post" action="/issue/{{ i.id }}/delete" onsubmit="return confirm('Permanently delete this issue?');">
+                            <button title="Delete" style="background: rgba(239,68,68,0.2); color: #f87171; border: 1px solid #f87171; padding: 4px 8px; border-radius: 6px; cursor: pointer;">🗑️ Delete</button>
+                        </form>
+                    </td>
+                </tr>
+                {% else %}
+                <tr><td colspan="6" style="text-align: center; color: var(--text-muted);">No resolved issues yet.</td></tr>
+                {% endfor %}
+            </table>
+        </div>
+    </div>
+
+    <div>
+        <div class="glass panel common-terminal">
+            <div class="panel-header" style="border-bottom-color: rgba(139, 92, 246, 0.3);">
+                <h2 class="terminal-header">COMMON_TERMINAL</h2>
+            </div>
+            <div style="max-height: 250px; overflow-y: auto; margin-bottom: 20px;">
+                {% for m in common_messages %}
+                <div class="message-box message-common">
+                    <div class="msg-meta">
+                        <span>Broadcast by {{ m.sender_id }}</span>
+                        <span>{{ m.created_at.strftime("%d %b %H:%M") }}</span>
+                    </div>
+                    <div class="msg-title">{{ m.subject }}</div>
+                    <div class="msg-body">{{ m.body }}</div>
+                    <div style="margin-top: 8px;">
+                        <form method="post" action="/messages/delete/{{ m.id }}" onsubmit="return confirm('Delete this broadcast?');">
+                            <button class="btn btn-danger" style="padding: 4px 8px; font-size: 12px; background: rgba(239,68,68,0.2); color: #f87171; border: 1px solid #f87171;">🗑️</button>
+                        </form>
+                    </div>
+                </div>
+                {% else %}
+                <p style="color: var(--text-muted);">No broadcasts.</p>
+                {% endfor %}
+            </div>
+            
+            <hr style="border: 0; border-top: 1px solid rgba(139, 92, 246, 0.3); margin: 20px 0;">
+            <h3 style="color: #c4b5fd; font-size: 14px;">> TRANSMIT_BROADCAST</h3>
+            <form method="post" action="/message/send">
+                <input type="hidden" name="msg_type" value="common">
+                <input type="hidden" name="receiver_id" value="ALL">
+                <label style="color: #a78bfa;">Subject</label>
+                <input name="subject" placeholder="Important announcement" required style="border-color: rgba(139,92,246,0.3);">
+                <label style="color: #a78bfa;">Message</label>
+                <textarea name="body" required style="border-color: rgba(139,92,246,0.3);"></textarea>
+                <button class="btn btn-purple" style="width: 100%;">Broadcast to All</button>
+            </form>
+        </div>
+
+        <div class="glass panel">
+            <div class="panel-header">
+                <h2>🔒 Confidential Inbox <span style="background: var(--danger); padding: 2px 8px; border-radius: 10px; font-size: 12px; margin-left: 8px;" id="unread">{{ unread }}</span></h2>
+            </div>
+            {% for m in messages %}
+            <div class="message-box" style="cursor: pointer; transition: background 0.2s; {% if not m.is_read and m.receiver_id == user.user_id %}border-left-color: var(--warning);{% endif %}" onclick="if (!event.target.closest('form') && !event.target.closest('button') && !event.target.closest('.msg-meta span')) window.location.href='/conversation/{{ m.sender_id }}/{{ m.receiver_id }}'" onmouseover="this.style.background='rgba(255,255,255,0.05)'" onmouseout="this.style.background='rgba(0,0,0,0.3)'">
+                <div class="msg-meta">
+                    <span style="color: var(--primary);">
+                        From <span style="cursor: pointer; text-decoration: underline;" onclick="quickMessage('{{ m.sender_id }}')" title="Message Sender">{{ m.sender_id }}</span> 
+                        to <span style="cursor: pointer; text-decoration: underline;" onclick="quickMessage('{{ m.receiver_id }}')" title="Message Receiver">{{ m.receiver_id }}</span>
+                    </span>
+                    <span>{{ m.created_at.strftime("%d %b %H:%M") }}</span>
+                </div>
+                <div class="msg-title">{{ m.subject }}</div>
+                <div class="msg-body">{{ m.body }}</div>
+                {% if m.attachment %}
+                <div style="margin-top: 10px;">
+                    <a href="{{ url_for('static', filename='reports/' + m.attachment) }}" download class="btn btn-primary" style="padding: 6px 12px; font-size: 13px; text-decoration: none;">📥 Download Excel/CSV</a>
+                </div>
+                {% endif %}
+                
+                <div style="margin-top: 10px; display: flex; gap: 8px;">
+                    <a href="/conversation/{{ m.sender_id }}/{{ m.receiver_id }}" class="btn" style="padding: 6px 12px; font-size: 13px; background: rgba(139,92,246,0.2); color: #c4b5fd; text-decoration: none;">View History</a>
+                    {% if m.receiver_id == user.user_id %}
+                        {% if not m.is_read %}
+                        <form method="post" action="/messages/read/{{ m.id }}">
+                            <button class="btn" style="padding: 6px 12px; font-size: 13px; background: rgba(255,255,255,0.1);">Mark Read</button>
+                        </form>
+                        {% endif %}
+                        <button class="btn btn-purple" style="padding: 6px 12px; font-size: 13px;" onclick="replyTo('{{ m.sender_id }}')">Reply</button>
+                    {% endif %}
+                    
+                    <form method="post" action="/conversation/delete/{{ m.sender_id }}/{{ m.receiver_id }}" onsubmit="return confirm('Delete this entire conversation? This action cannot be undone.');">
+                        <button class="btn btn-danger" style="padding: 6px 12px; font-size: 13px;" title="Delete Conversation">🗑️</button>
+                    </form>
+                </div>
+            </div>
+            {% else %}
+            <p style="color: var(--text-muted);">No confidential messages.</p>
+            {% endfor %}
+
+            <hr style="border: 0; border-top: 1px solid var(--glass-border); margin: 20px 0;">
+            
+            <h3>Send Secure Message</h3>
+            <form method="post" action="/message/send" id="secureMsgForm">
+                <input type="hidden" name="msg_type" value="confidential">
+                <label>Receiver ID</label>
+                <select name="receiver_id" required style="background: rgba(0,0,0,0.2); border: 1px solid var(--glass-border); color: var(--text-main); padding: 12px 16px; border-radius: 10px; width: 100%; margin-bottom: 16px;">
+                    <option value="" disabled selected>Whom to send?</option>
+                    {% for u in active_users %}
+                        {% if u.user_id != user.user_id %}
+                        <option value="{{ u.user_id }}">{{ u.name }} ({{ u.role|capitalize }})</option>
+                        {% endif %}
+                    {% endfor %}
+                </select>
+                <label>Message</label>
+                <textarea name="body" required></textarea>
+                <button class="btn" style="width: 100%;">Send Secure</button>
+            </form>
+        </div>
+    </div>
+</div>
+
+<script>
+let last = {{ movements[0].id if movements else 0 }}, first = true;
+async function poll() {
+    try {
+        let r = await fetch('/api/dashboard', { cache: 'no-store' });
+        let d = await r.json();
+        if(d.logged_in) {
+            document.getElementById('tin').textContent = d.total_in;
+            document.getElementById('tout').textContent = d.total_out;
+            document.getElementById('issues').textContent = d.open_issues;
+            document.getElementById('unread').textContent = d.unread;
+        }
+    } catch(e) {}
+}
+setInterval(poll, 5000);
+</script>
+{% endblock %}
